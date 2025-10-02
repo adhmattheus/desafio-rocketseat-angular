@@ -1,5 +1,8 @@
-import { Component } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
+import { ProductsService } from '../../services/products';
+import { INewProductRequest } from '../../interfaces/new-product-request';
+import { take } from 'rxjs';
 
 @Component({
   selector: 'app-new-product',
@@ -9,6 +12,7 @@ import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angula
 })
 export class NewProduct {
   productImageBase64 = '';
+  successMessage = '';
 
   productForm = new FormGroup({
     title: new FormControl('', [Validators.required]),
@@ -17,14 +21,32 @@ export class NewProduct {
     category: new FormControl('', [Validators.required]),
   });
 
-  saveProduct() {
-    if (this.productForm.valid) {
-      const productData = this.productForm.value;
+  private readonly _productsService = inject(ProductsService);
 
-      console.log('Produto salvo com sucesso:', productData);
-    } else {
-      console.log('Formulário inválido');
-    }
+  saveProduct() {
+    if (this.productForm.invalid || !this.productImageBase64) return;
+
+    const newProduct: INewProductRequest = {
+      title: this.productForm.value.title as string,
+      description: this.productForm.value.description as string,
+      price: Number(this.productForm.value.price),
+      category: this.productForm.value.category as string,
+      imageBase64: this.productImageBase64,
+    };
+
+    this._productsService
+      .saveProduct(newProduct)
+      .pipe(take(1))
+      .subscribe({
+        next: (response) => {
+          this.successMessage = response.message;
+          this.productForm.reset();
+          this.productImageBase64 = '';
+        },
+        error: (error) => {
+          console.error('Erro ao salvar o produto:', error);
+        },
+      });
   }
 
   onFileSelected(event: Event) {
@@ -41,7 +63,6 @@ export class NewProduct {
     reader.onload = (e) => {
       const imageBase64 = e.target?.result as string;
       this.productImageBase64 = imageBase64;
-      console.log('Imagem em Base64:', imageBase64);
     };
     reader.onerror = (error) => {
       this.productImageBase64 = '';
